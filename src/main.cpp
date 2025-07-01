@@ -16,37 +16,21 @@ void printWelcome() {
     std::cout << "  Functions: sin, cos, tan, exp, log, sqrt, abs" << std::endl;
     std::cout << "  Operators: +, -, *, /, ^" << std::endl;
     std::cout << std::endl;
-    std::cout << "Example equations:" << std::endl;
-    std::cout << "  Heat equation: 0.1 * (d2u/dx2 + d2u/dy2 + d2u/dz2)" << std::endl;
-    std::cout << "  Wave equation: d2u/dx2 + d2u/dy2 + d2u/dz2" << std::endl;
-    std::cout << "  Reaction-diffusion: 0.1 * (d2u/dx2 + d2u/dy2) + u * (1 - u)" << std::endl;
-    std::cout << "  With source term: 0.1 * (d2u/dx2 + d2u/dy2) + sin(x) * cos(y)" << std::endl;
+    std::cout << "Usage: CudaProjDifferentials \"<equation>\" [time_steps]" << std::endl;
+    std::cout << "Example: CudaProjDifferentials \"0.1 * (d2u/dx2 + d2u/dy2)\" 1000" << std::endl;
     std::cout << std::endl;
 }
 
-void printPresetEquations() {
-    std::cout << "Available preset equations:" << std::endl;
-    std::cout << "1. Heat equation (default)" << std::endl;
-    std::cout << "2. Fast diffusion" << std::endl;
-    std::cout << "3. Anisotropic diffusion" << std::endl;
-    std::cout << "4. Reaction-diffusion" << std::endl;
-    std::cout << "5. Wave equation (simplified)" << std::endl;
-    std::cout << "6. Custom equation" << std::endl;
-}
-
-std::string getPresetEquation(int choice) {
-    switch (choice) {
-        case 1: return "0.1 * (d2u/dx2 + d2u/dy2 + d2u/dz2)";
-        case 2: return "0.5 * (d2u/dx2 + d2u/dy2 + d2u/dz2)";
-        case 3: return "0.2 * d2u/dx2 + 0.1 * d2u/dy2 + 0.05 * d2u/dz2";
-        case 4: return "0.1 * (d2u/dx2 + d2u/dy2) + u * (1 - u)";
-        case 5: return "d2u/dx2 + d2u/dy2 + d2u/dz2";
-        default: return "";
-    }
-}
-
-int main() {
+int main(int argc, char* argv[]) {
     printWelcome();
+
+    if (argc < 2) {
+        std::cerr << "Error: No equation provided." << std::endl;
+        std::cerr << "Usage: CudaProjDifferentials \"<equation>\" [time_steps]" << std::endl;
+        return 1;
+    }
+
+    std::string equation = argv[1];
 
     // Grid parameters
     int nx = 64, ny = 64, nz = 64;
@@ -60,26 +44,6 @@ int main() {
     // Create solver
     PDESolver solver(nx, ny, nz, dx, dy, dz, dt);
 
-    // Get equation from user
-    printPresetEquations();
-    std::cout << "Choose an option (1-6): ";
-    
-    int choice;
-    std::cin >> choice;
-    std::cin.ignore(); // Consume newline
-    
-    std::string equation;
-    if (choice >= 1 && choice <= 5) {
-        equation = getPresetEquation(choice);
-        std::cout << "Selected equation: " << equation << std::endl;
-    } else if (choice == 6) {
-        std::cout << "Enter your custom equation (du/dt = ?): ";
-        std::getline(std::cin, equation);
-    } else {
-        std::cout << "Invalid choice. Using default heat equation." << std::endl;
-        equation = getPresetEquation(1);
-    }
-
     // Set the equation
     solver.setEquation(equation);
     std::cout << std::endl;
@@ -90,14 +54,11 @@ int main() {
 
     // Ask for number of time steps
     int timeSteps = 1000;
-    std::cout << "Number of time steps (default 1000): ";
-    std::string input;
-    std::getline(std::cin, input);
-    if (!input.empty()) {
+    if (argc > 2) {
         try {
-            timeSteps = std::stoi(input);
+            timeSteps = std::stoi(argv[2]);
         } catch (...) {
-            std::cout << "Invalid input, using default: " << timeSteps << std::endl;
+            std::cout << "Invalid time steps provided, using default: " << timeSteps << std::endl;
         }
     }
 
