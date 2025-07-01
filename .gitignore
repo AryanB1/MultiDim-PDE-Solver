@@ -1,0 +1,13 @@
+build/
+*.exe
+*.lib
+*.exp
+*.pdb
+*.obj
+*.o
+output.txt
+equation_info.txt
+.vs/
+Debug/
+Release/
+x64/
