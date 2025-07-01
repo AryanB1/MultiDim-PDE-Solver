@@ -26,7 +26,7 @@ function(setup_cuda_target target)
 endfunction()
 
 # Core library
-add_library(CudaProjCore STATIC src/solver_new.cu src/parser.cpp)
+add_library(CudaProjCore STATIC src/solver.cu src/parser.cpp)
 target_include_directories(CudaProjCore PUBLIC include)
 target_link_libraries(CudaProjCore PUBLIC CUDA::cudart)
 setup_cuda_target(CudaProjCore)

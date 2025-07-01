@@ -6,26 +6,6 @@
 #include <string>
 #include <sstream>
 
-__device__ double evaluateCustomEquation(double* grid, int idx, int i, int j, int k, 
-                                        int nx, int ny, int nz, double dx, double dy, double dz, 
-                                        double dt, double currentTime, const char* kernelCode);
-const char* kernelTemplate = R"(
-__global__ void customStepKernel(double* grid, double* newGrid, int nx, int ny, int nz,
-                                double dx, double dy, double dz, double dt, double currentTime) {
-    int i = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
-    int j = static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y);
-    int k = static_cast<int>(blockIdx.z * blockDim.z + threadIdx.z);
-
-    if (i >= 1 && i < nx-1 && j >= 1 && j < ny-1 && k >= 1 && k < nz-1) {
-        int idx = (k*ny + j)*nx + i;
-        
-        double result = %s;
-        
-        newGrid[idx] = grid[idx] + dt * result;
-    }
-}
-)";
-
 __global__ void heatEquationKernel(double* grid, double* newGrid, int nx, int ny, int nz,
                                   double dx, double dy, double dz, double dt, double alpha) {
     int i = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
@@ -41,43 +21,6 @@ __global__ void heatEquationKernel(double* grid, double* newGrid, int nx, int ny
         double d2udz2 = (grid[(((k+1)*ny + j)*nx + i)] - 2.0*grid[idx] + grid[(((k-1)*ny + j)*nx + i)]) / (dz*dz);
 
         newGrid[idx] = grid[idx] + dt * alpha * (d2udx2 + d2udy2 + d2udz2);
-    }
-}
-
-__global__ void waveEquationKernel(double* grid, double* newGrid, double* prevGrid, int nx, int ny, int nz,
-                                  double dx, double dy, double dz, double dt, double c) {
-    int i = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
-    int j = static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y);
-    int k = static_cast<int>(blockIdx.z * blockDim.z + threadIdx.z);
-
-    if (i >= 1 && i < nx-1 && j >= 1 && j < ny-1 && k >= 1 && k < nz-1) {
-        int idx = (k*ny + j)*nx + i;
-
-        // Wave equation: d2u/dt2 = c^2 * (d2u/dx2 + d2u/dy2 + d2u/dz2)
-        double d2udx2 = (grid[((k*ny + j)*nx + i+1)] - 2.0*grid[idx] + grid[((k*ny + j)*nx + i-1)]) / (dx*dx);
-        double d2udy2 = (grid[((k*ny + j+1)*nx + i)] - 2.0*grid[idx] + grid[((k*ny + j-1)*nx + i)]) / (dy*dy);
-        double d2udz2 = (grid[(((k+1)*ny + j)*nx + i)] - 2.0*grid[idx] + grid[(((k-1)*ny + j)*nx + i)]) / (dz*dz);
-
-        double laplacian = d2udx2 + d2udy2 + d2udz2;
-        newGrid[idx] = 2.0*grid[idx] - prevGrid[idx] + dt*dt * c*c * laplacian;
-    }
-}
-
-__global__ void advectionKernel(double* grid, double* newGrid, int nx, int ny, int nz,
-                               double dx, double dy, double dz, double dt, double vx, double vy, double vz) {
-    int i = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
-    int j = static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y);
-    int k = static_cast<int>(blockIdx.z * blockDim.z + threadIdx.z);
-
-    if (i >= 1 && i < nx-1 && j >= 1 && j < ny-1 && k >= 1 && k < nz-1) {
-        int idx = (k*ny + j)*nx + i;
-
-        // Advection equation: du/dt + v·∇u = 0
-        double dudx = (grid[((k*ny + j)*nx + i+1)] - grid[((k*ny + j)*nx + i-1)]) / (2.0*dx);
-        double dudy = (grid[((k*ny + j+1)*nx + i)] - grid[((k*ny + j-1)*nx + i)]) / (2.0*dy);
-        double dudz = (grid[(((k+1)*ny + j)*nx + i)] - grid[(((k-1)*ny + j)*nx + i)]) / (2.0*dz);
-
-        newGrid[idx] = grid[idx] - dt * (vx*dudx + vy*dudy + vz*dudz);
     }
 }
 
@@ -187,22 +130,9 @@ void PDESolver::solve(int timeSteps) {
     int reportInterval = timeSteps / 10;
     if (reportInterval == 0) reportInterval = 1;
 
-    // Determine which kernel to use based on equation type
-    bool useHeatKernel = (equation_.find("d2u/dx2") != std::string::npos && 
-                         equation_.find("d2u/dy2") != std::string::npos && 
-                         equation_.find("d2u/dz2") != std::string::npos &&
-                         equation_.find("0.1") != std::string::npos);
-
     for (int t = 0; t < timeSteps; ++t) {
-        double currentTime = t * dt_;
-        
-        if (useHeatKernel) {
-            // Use optimized heat equation kernel
-            heatEquationKernel<<<gridDim, block>>>(d_grid, d_newGrid, nx_, ny_, nz_, dx_, dy_, dz_, dt_, 0.1);
-        } else {
-        // For now, fall back to heat equation for complex custom equations
-            heatEquationKernel<<<gridDim, block>>>(d_grid, d_newGrid, nx_, ny_, nz_, dx_, dy_, dz_, dt_, 0.1);
-        }
+        // Use heat equation kernel (currently the only implemented solver)
+        heatEquationKernel<<<gridDim, block>>>(d_grid, d_newGrid, nx_, ny_, nz_, dx_, dy_, dz_, dt_, 0.1);
         
         cudaDeviceSynchronize();
 
