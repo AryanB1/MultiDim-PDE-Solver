@@ -1,16 +1,7 @@
-/**
- * @file test_parser.cpp
- * @brief Unit tests for the equation parser
- */
-
 #include <gtest/gtest.h>
 #include <memory>
 #include "parser.h"
 
-/**
- * @class ParserTest
- * @brief Test fixture for parser tests
- */
 class ParserTest : public ::testing::Test {
 protected:
     void SetUp() override {

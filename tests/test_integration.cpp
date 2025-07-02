@@ -1,8 +1,3 @@
-/**
- * @file test_integration.cpp
- * @brief Integration tests for the complete CUDA PDE solver workflow
- */
-
 #include <gtest/gtest.h>
 #include <memory>
 #include <fstream>
@@ -12,10 +7,6 @@
 #include "solver.h"
 #include "parser.h"
 
-/**
- * @class IntegrationTest
- * @brief Test fixture for integration tests
- */
 class IntegrationTest : public ::testing::Test {
 protected:
     void SetUp() override {

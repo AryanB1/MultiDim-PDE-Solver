@@ -1,8 +1,3 @@
-/**
- * @file test_solver.cpp
- * @brief Unit tests for the PDE solver
- */
-
 #include <gtest/gtest.h>
 #include <memory>
 #include <cmath>
@@ -10,10 +5,6 @@
 #include <string>
 #include "solver.h"
 
-/**
- * @class SolverTest
- * @brief Test fixture for solver tests
- */
 class SolverTest : public ::testing::Test {
 protected:
     void SetUp() override {

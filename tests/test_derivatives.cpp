@@ -1,15 +1,6 @@
-/**
- * @file test_derivatives.cpp
- * @brief Unit tests for derivative parsing
- */
-
 #include <gtest/gtest.h>
 #include "parser.h"
 
-/**
- * @class DerivativeTest
- * @brief Test fixture for derivative parsing tests
- */
 class DerivativeTest : public ::testing::Test {
 protected:
     void SetUp() override {

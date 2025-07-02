@@ -1,16 +1,7 @@
-/**
- * @file test_main.cpp
- * @brief Main entry point for CUDA PDE Solver test suite
- */
-
 #include <gtest/gtest.h>
 #include <iostream>
 #include <cuda_runtime.h>
 
-/**
- * @class CudaEnvironment
- * @brief Global test environment for CUDA setup/cleanup
- */
 class CudaEnvironment : public ::testing::Environment {
 public:
     void SetUp() override {
