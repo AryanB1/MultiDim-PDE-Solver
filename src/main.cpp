@@ -11,13 +11,13 @@ void printWelcome() {
     std::cout << "This solver can handle custom partial differential equations." << std::endl;
     std::cout << std::endl;
     std::cout << "Supported syntax:" << std::endl;
-    std::cout << "  Variables: u (solution), x, y, z, t (time)" << std::endl;
+    std::cout << "  Variables: u (solution), x, y, z, t" << std::endl;
     std::cout << "  Derivatives: du/dx, d2u/dx2, d2u/dy2, d2u/dz2" << std::endl;
     std::cout << "  Functions: sin, cos, tan, exp, log, sqrt, abs" << std::endl;
     std::cout << "  Operators: +, -, *, /, ^" << std::endl;
     std::cout << std::endl;
-    std::cout << "Usage: CudaProjDifferentials \"<equation>\" [time_steps]" << std::endl;
-    std::cout << "Example: CudaProjDifferentials \"0.1 * (d2u/dx2 + d2u/dy2)\" 1000" << std::endl;
+    std::cout << "Usage: ./CudaProjDifferentials \"<equation>\" [time_steps]" << std::endl;
+    std::cout << "Example: ./CudaProjDifferentials \"0.1 * (d2u/dx2 + d2u/dy2)\" 1000" << std::endl;
     std::cout << std::endl;
 }
 
@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
 
     if (argc < 2) {
         std::cerr << "Error: No equation provided." << std::endl;
-        std::cerr << "Usage: CudaProjDifferentials \"<equation>\" [time_steps]" << std::endl;
+        std::cerr << "Usage: ./CudaProjDifferentials \"<equation>\" [time_steps]" << std::endl;
         return 1;
     }
 

@@ -1,28 +1,12 @@
 #include "solver.h"
 #include "parser.h"
 #include <cuda_runtime.h>
+#include <nvrtc.h>
+#include <cuda.h>
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <sstream>
-
-__global__ void heatEquationKernel(double* grid, double* newGrid, int nx, int ny, int nz,
-                                  double dx, double dy, double dz, double dt, double alpha) {
-    int i = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
-    int j = static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y);
-    int k = static_cast<int>(blockIdx.z * blockDim.z + threadIdx.z);
-
-    if (i >= 1 && i < nx-1 && j >= 1 && j < ny-1 && k >= 1 && k < nz-1) {
-        int idx = (k*ny + j)*nx + i;
-
-        // Heat equation: du/dt = alpha * (d2u/dx2 + d2u/dy2 + d2u/dz2)
-        double d2udx2 = (grid[((k*ny + j)*nx + i+1)] - 2.0*grid[idx] + grid[((k*ny + j)*nx + i-1)]) / (dx*dx);
-        double d2udy2 = (grid[((k*ny + j+1)*nx + i)] - 2.0*grid[idx] + grid[((k*ny + j-1)*nx + i)]) / (dy*dy);
-        double d2udz2 = (grid[(((k+1)*ny + j)*nx + i)] - 2.0*grid[idx] + grid[(((k-1)*ny + j)*nx + i)]) / (dz*dz);
-
-        newGrid[idx] = grid[idx] + dt * alpha * (d2udx2 + d2udy2 + d2udz2);
-    }
-}
 
 PDESolver::PDESolver(int nx, int ny, int nz, double dx, double dy, double dz, double dt)
     : nx_(nx), ny_(ny), nz_(nz), dx_(dx), dy_(dy), dz_(dz), dt_(dt) {
@@ -93,8 +77,21 @@ void PDESolver::generateKernelCode() {
             std::cerr << "Warning: Equation may not be a valid PDE" << std::endl;
         }
         
-        generatedKernelCode_ = parser_.generateCudaCode(ast);
-        
+        std::string body = parser_.generateCudaCode(ast);
+
+        // Full kernel code as a string
+        std::stringstream kernel_ss;
+        kernel_ss << R"(extern "C" __global__ void customKernel(double* grid, double* newGrid, int nx, int ny, int nz, double dx, double dy, double dz, double dt) {)" << std::endl;
+        kernel_ss << R"(    int i = blockIdx.x * blockDim.x + threadIdx.x;)" << std::endl;
+        kernel_ss << R"(    int j = blockIdx.y * blockDim.y + threadIdx.y;)" << std::endl;
+        kernel_ss << R"(    int k = blockIdx.z * blockDim.z + threadIdx.z;)" << std::endl;
+        kernel_ss << R"(    if (i >= 1 && i < nx - 1 && j >= 1 && j < ny - 1 && k >= 1 && k < nz - 1) {)" << std::endl;
+        kernel_ss << R"(        int idx = (k * ny + j) * nx + i;)" << std::endl;
+        kernel_ss << R"(        newGrid[idx] = grid[idx] + dt * ()" << body << R"();)" << std::endl;
+        kernel_ss << R"(    })" << std::endl;
+        kernel_ss << R"(})" << std::endl;
+        generatedKernelCode_ = kernel_ss.str();
+
         // Get variables used in the equation
         auto variables = parser_.getVariables(ast);
         std::cout << "Variables in equation: ";
@@ -120,6 +117,41 @@ void PDESolver::solve(int timeSteps) {
     cudaMalloc(&d_newGrid, size);
     cudaMemcpy(d_grid, grid_.data(), size, cudaMemcpyHostToDevice);
 
+    // NVRTC Compilation
+    nvrtcProgram prog;
+    nvrtcCreateProgram(&prog, generatedKernelCode_.c_str(), "custom_kernel.cu", 0, nullptr, nullptr);
+    const char* opts[] = {"--gpu-architecture=compute_75"}; // Example, adjust for your GPU
+    nvrtcResult compileResult = nvrtcCompileProgram(prog, 1, opts);
+
+    if (compileResult != NVRTC_SUCCESS) {
+        size_t logSize;
+        nvrtcGetProgramLogSize(prog, &logSize);
+        char* log = new char[logSize];
+        nvrtcGetProgramLog(prog, log);
+        std::cerr << "NVRTC compilation failed:\n" << log << std::endl;
+        delete[] log;
+        return;
+    }
+
+    size_t ptxSize;
+    nvrtcGetPTXSize(prog, &ptxSize);
+    char* ptx = new char[ptxSize];
+    nvrtcGetPTX(prog, ptx);
+    nvrtcDestroyProgram(&prog);
+
+    // CUDA Driver API to load and launch kernel
+    CUdevice cuDevice;
+    CUcontext cuContext;
+    CUmodule cuModule;
+    CUfunction cuFunction;
+
+    cuInit(0);
+    cuDeviceGet(&cuDevice, 0);
+    cuCtxCreate(&cuContext, 0, cuDevice);
+    cuModuleLoadDataEx(&cuModule, ptx, 0, 0, 0);
+    cuModuleGetFunction(&cuFunction, cuModule, "customKernel");
+    delete[] ptx;
+
     // Set up CUDA execution configuration
     dim3 block(8, 8, 8);
     dim3 gridDim((nx_ + block.x - 1) / block.x,
@@ -131,8 +163,8 @@ void PDESolver::solve(int timeSteps) {
     if (reportInterval == 0) reportInterval = 1;
 
     for (int t = 0; t < timeSteps; ++t) {
-        // Use heat equation kernel (currently the only implemented solver)
-        heatEquationKernel<<<gridDim, block>>>(d_grid, d_newGrid, nx_, ny_, nz_, dx_, dy_, dz_, dt_, 0.1);
+        void* args[] = {&d_grid, &d_newGrid, &nx_, &ny_, &nz_, &dx_, &dy_, &dz_, &dt_};
+        cuLaunchKernel(cuFunction, gridDim.x, gridDim.y, gridDim.z, block.x, block.y, block.z, 0, nullptr, args, nullptr);
         
         cudaDeviceSynchronize();
 

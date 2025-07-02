@@ -336,7 +336,7 @@ void EquationParser::collectVariables(const ASTNodePtr& node, std::vector<std::s
 
 // DerivativeParser implementation
 bool DerivativeParser::isDerivative(const std::string& expr) {
-    // Match patterns like: d2u/dx2, du/dx, d2u/dy2, etc.
+    // Match patterns like: d2u/dx2, du/dx, d2u/dy2
     std::regex derivRegex(R"(d(\d*)u/d([xyz])(\d*))");
     return std::regex_match(expr, derivRegex);
 }
